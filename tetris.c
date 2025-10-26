@@ -1,147 +1,223 @@
-// Inclusão das bibliotecas necessárias
+// Inclusão das bibliotecas necessárias pro programa funcionar
 #include <stdio.h>
-#include <stdlib.h> // Para as funções rand(), srand() (aleatório) e exit() (sair)
-#include <time.h>   // Para a função time() (usada no srand)
+#include <stdlib.h> // Para rand(), srand() e exit()
+#include <time.h>   // Para a função time() (semente do rand)
 
-// --- CONSTANTES E ESTRUTURAS GLOBAIS ---
+// CONSTANTES E ESTRUTURAS GLOBAIS
 
-// Define o tamanho máximo da nossa fila de peças.
-#define TAMANHO_FILA 5
+#define TAMANHO_FILA 5     // Quantas peças aparecem na fila
+#define CAPACIDADE_PILHA 3 // Quantas peças pode reservar (segurar)
 
 // Struct 'Peca', o 'molde' para uma peça do jogo
 struct Peca {
-    char nome; // 'I', 'O', 'T', 'L'
-    int id;   // Um número único pra peça
+    char nome;
+    int id;
 };
 
-// VARIÁVEIS GLOBAIS PARA A FILA CIRCULAR 
-struct Peca fila[TAMANHO_FILA]; // O vetor onde as peças ficam
-int inicio = 0;         // Índice de onde a peça vai SAIR (dequeue)
-int fim = 0;            // Índice de onde a próxima peça vai ENTRAR (enqueue)
-int totalItens = 0;     // Contador para saber se a fila está cheia ou vazia
+// VARIÁVEIS GLOBAIS PARA A FILA E PILHA
+
+// Fila Circular FIFO (First In, First Out)
+struct Peca fila[TAMANHO_FILA];
+int inicioFila = 0; // Índice de onde a peça sai
+int fimFila = 0;   // Índice de onde a peça entra
+int totalFila = 0;   // Contador de quantas peças tem na fila
+
+// Pilha Linear LIFO (Last In, First Out)
+struct Peca pilha[CAPACIDADE_PILHA];
+int topo = -1; // A pilha começa vazia (topo = -1)
 
 // Funções
+
+// Funções de geração de peça
 struct Peca gerarPeca();
+
+// Funções de manipulação da Fila
 void enqueue();
-void dequeue();
-void exibirFila();
+struct Peca dequeue();
 
-// FUNÇÃO PRINCIPAL 
+// Funções de manipulação da Pilha
+void push(struct Peca peca);
+struct Peca pop();
+
+// Funções de ação do jogador
+void jogarPeca();
+void reservarPeca();
+void usarPecaReservada();
+
+// Função de visualização
+void exibirEstado();
+
+
+// FUNÇÃO PRINCIPAL
 int main() {
-    // Prepara o gerador de números aleatórios (rand)
-    // Usa o 'time(NULL)' como semente para as peças serem diferentes a cada jogo
-    srand(time(NULL));
-
+    srand(time(NULL)); // Prepara o gerador aleatório
     int opcao;
 
+    printf("Inicializando o Tetris Stack...\n");
     // Enche a fila de peças antes do jogo começar
-    printf("Inicializando a fila de peças...\n");
     for (int i = 0; i < TAMANHO_FILA; i++) {
         enqueue();
     }
 
-    // Loop principal do menu
+    // Loop principal do jogo
     while (1) {
-        exibirFila();
-        printf("\nOpções de ação:\n");
-        printf("1. Jogar peça (dequeue)\n");
-        printf("2. Inserir nova peça (enqueue)\n");
+        exibirEstado(); // Mostra o tabuleiro (fila e pilha)
+        printf("\nOpções de Ação:\n");
+        printf("1. Jogar peça da fila\n");
+        printf("2. Reservar peça (da fila para a pilha)\n");
+        printf("3. Usar peça reservada (da pilha)\n");
         printf("0. Sair\n");
-        printf("Escolha uma opção: ");
+        printf("Opção: ");
         scanf("%d", &opcao);
 
         switch (opcao) {
             case 1:
-                dequeue(); // Tira do começo
+                jogarPeca();
                 break;
             case 2:
-                enqueue(); // Coloca no fim
+                reservarPeca();
+                break;
+            case 3:
+                usarPecaReservada();
                 break;
             case 0:
-                printf("\nSaindo do Tetris Stack...\n");
-                exit(0); // Fecha o programa
+                printf("\nSaindo do jogo...\n");
+                exit(0);
             default:
-                printf("\n*** Opção inválida! Tente novamente. ***\n");
+                printf("\n*** Opção inválida! ***\n");
         }
     }
 
     return 0;
 }
 
-// Função que cria uma nova peça aleatória
-struct Peca gerarPeca() {
-    // 'static' faz o 'proximoId' NÃO ser zerado toda vez que a função é chamada.
-    // Ele guarda o valor da última execução (0, 1, 2, 3...)
-    static int proximoId = 0;
+// FUNÇÕES DE GERAÇÃO E ESTRUTURAS DE DADOS
 
+struct Peca gerarPeca() {
+    // 'static' faz o ID não zerar toda vez que a função é chamada
+    static int proximoId = 0;
     struct Peca novaPeca;
     char tiposDePeca[] = {'I', 'O', 'T', 'L', 'S', 'Z', 'J'};
-    
-    // Sorteia um tipo (rand() % 7 dá um número de 0 a 6)
     novaPeca.nome = tiposDePeca[rand() % 7];
-    // Atribui o ID e depois aumenta (proximoId++)
     novaPeca.id = proximoId++;
-    
     return novaPeca;
 }
 
-// Adiciona uma nova peça no FIM da fila
+// Operações da Fila
+// Coloca uma peça no final da fila
 void enqueue() {
-    // Checa se a fila está cheia
-    if (totalItens >= TAMANHO_FILA) {
-        printf("\n>>> A fila de peças futuras está cheia! Jogue uma peça primeiro. <<<\n");
-        return; // Sai da função
-    }
-
-    // Cria uma peça nova
-    struct Peca novaPeca = gerarPeca();
-
-    // Coloca a peça na posição 'fim'
-    fila[fim] = novaPeca;
-
-    // Atualiza o 'fim' para a próxima posição (de forma circular)
-    // O '%' (módulo) faz o 'fim' voltar para 0 se ele chegar no limite.
-    fim = (fim + 1) % TAMANHO_FILA;
-
-    // Avisa que tem mais um item
-    totalItens++;
-
-    printf("\n>>> Nova peça [%c %d] adicionada à fila! <<<\n", novaPeca.nome, novaPeca.id);
+    if (totalFila >= TAMANHO_FILA) return; // Fila cheia, não faz nada
+    fila[fimFila] = gerarPeca();
+    fimFila = (fimFila + 1) % TAMANHO_FILA; // O '%' faz a "volta" no vetor
+    totalFila++;
 }
 
-// Remove uma peça do INÍCIO da fila
-void dequeue() {
-    // Checa se a fila está vazia
-    if (totalItens == 0) {
-        printf("\n>>> A fila está vazia! Não há peças para jogar. <<<\n");
+// Tira uma peça do inicio da fila
+struct Peca dequeue() {
+    struct Peca pecaRemovida = { ' ', -1 }; // Cria uma "peça vazia" para retornar se der erro
+    if (totalFila == 0) return pecaRemovida; // Fila vazia, retorna a peça vazia
+    
+    pecaRemovida = fila[inicioFila];
+    inicioFila = (inicioFila + 1) % TAMANHO_FILA; // O inicio avança (dando a volta)
+    totalFila--;
+    return pecaRemovida;
+}
+
+// Operações da Pilha
+// Coloca uma peça no topo da pilha
+void push(struct Peca peca) {
+    // Checa se a pilha está cheia (se o topo está no último índice)
+    if (topo >= CAPACIDADE_PILHA - 1) { 
+        printf("\n>>> A pilha de reserva está cheia! <<<\n");
+        // (Nesse caso, a peça que ia entrar é "perdida")
         return;
     }
-
-    // Pega a peça que está no 'inicio' (só para mostrar qual foi)
-    struct Peca pecaJogada = fila[inicio];
-
-    // Atualiza o 'inicio' para a próxima posição (de forma circular)
-    inicio = (inicio + 1) % TAMANHO_FILA;
-    
-    // Avisa que tem um item a menos
-    totalItens--;
-
-    printf("\n>>> Peça [%c %d] foi jogada! <<<\n", pecaJogada.nome, pecaJogada.id);
+    topo++; // Sobe o topo
+    pilha[topo] = peca; // Coloca a peça no novo topo
 }
 
-// Mostra o estado atual da fila (do início ao fim)
-void exibirFila() {
-    printf("\n-----------------------------------\n");
-    printf("Fila de peças: ");
-    if (totalItens == 0) {
-        printf("[VAZIA]");
+// Tira uma peça do topo da pilha
+struct Peca pop() {
+    struct Peca pecaRemovida = { ' ', -1 }; // Peça vazia para caso de erro
+    if (topo == -1) return pecaRemovida; // Pilha vazia
+    
+    pecaRemovida = pilha[topo]; // Pega a peça do topo
+    topo--; // Desce o topo
+    return pecaRemovida;
+}
+
+// FUNÇÕES DE AÇÃO DO JOGADOR
+
+// Tira a peça da frente da fila e coloca uma nova no final
+void jogarPeca() {
+    if (totalFila == 0) {
+        printf("\n>>> Fila vazia, impossível jogar! <<<\n");
+        return;
+    }
+    struct Peca pecaJogada = dequeue(); // Tira do início
+    printf("\n>>> Peça [%c %d] foi jogada da fila! <<<\n", pecaJogada.nome, pecaJogada.id);
+    enqueue(); // Adiciona uma nova peça no fim para repor
+}
+
+// Tira a peça da frente da fila e coloca no topo da pilha (reserva)
+void reservarPeca() {
+    // Checa se a pilha (destino) está cheia
+    if (topo >= CAPACIDADE_PILHA - 1) {
+        printf("\n>>> Pilha de reserva cheia! Impossível reservar. <<<\n");
+        return;
+    }
+    // Checa se a fila (origem) está vazia
+    if (totalFila == 0) {
+        printf("\n>>> Fila vazia, impossível reservar! <<<\n");
+        return;
+    }
+    struct Peca pecaReservada = dequeue(); // Tira da fila
+    push(pecaReservada); // Coloca na pilha
+    printf("\n>>> Peça [%c %d] movida da fila para a reserva! <<<\n", pecaReservada.nome, pecaReservada.id);
+    enqueue(); // Adiciona uma nova peça no fim da fila para repor
+}
+
+// Tira a peça do topo da pilha (reserva) para usar no jogo
+void usarPecaReservada() {
+    if (topo == -1) {
+        printf("\n>>> Pilha de reserva está vazia! <<<\n");
+        return;
+    }
+    struct Peca pecaUsada = pop(); // Tira da pilha
+    printf("\n>>> Peça [%c %d] foi usada da reserva! <<<\n", pecaUsada.nome, pecaUsada.id);
+}
+
+
+// FUNÇÃO DE VISUALIZAÇÃO
+
+// Mostra o estado da Fila e da Pilha
+void exibirEstado() {
+    printf("\n============================================\n");
+    printf("ESTADO ATUAL DO JOGO\n");
+    
+    // Exibe a Fila
+    printf("Fila de peças (Frente -> Fim):\n");
+    if (totalFila == 0) {
+        printf("[VAZIA]\n");
     } else {
-        // Para mostrar na ordem certa (do 'inicio' até o 'fim')
-        for (int i = 0; i < totalItens; i++) {
-            // Calcula o índice real (dando a volta no vetor se precisar)
-            int indice = (inicio + i) % TAMANHO_FILA;
+        // Loop para mostrar na ordem certa (do inicio até o fim)
+        for (int i = 0; i < totalFila; i++) {
+            int indice = (inicioFila + i) % TAMANHO_FILA;
             printf("[%c %d] ", fila[indice].nome, fila[indice].id);
         }
+        printf("\n");
     }
-    printf("\n-----------------------------------\n");
+
+    // Exibe a Pilha
+    printf("\nPilha de reserva (Topo -> Base):\n");
+    if (topo == -1) {
+        printf("[VAZIA]\n");
+    } else {
+        // Mostra do topo (i = topo) para a base (i = 0)
+        for (int i = topo; i >= 0; i--) {
+            printf("[%c %d] ", pilha[i].nome, pilha[i].id);
+        }
+        printf("\n");
+    }
+    printf("============================================\n");
 }
